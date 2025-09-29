@@ -245,6 +245,13 @@
       "when": 1758825944181,
       "tag": "0034_fix_chat_group",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1759132802489,
+      "tag": "0035_lame_power_man",
+      "breakpoints": true
     }
   ],
   "version": "6"
