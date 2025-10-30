@@ -1,6 +1,14 @@
 import { and, cosineDistance, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import {
+  IdentityTypeEnum,
+  LayersEnum,
+  MergeStrategyEnum,
+  RelationshipEnum,
+  TypesEnum,
+} from '@/types/userMemory';
+
+import {
   UserMemoryContext,
   UserMemoryExperience,
   UserMemoryIdentity,
@@ -13,50 +21,6 @@ import {
   userMemoriesPreferences,
 } from '../schemas';
 import { LobeChatDatabase } from '../type';
-
-export enum RelationshipEnum {
-  Aunt = 'aunt',
-  Brother = 'brother',
-  Classmate = 'classmate',
-  Colleague = 'colleague',
-  Couple = 'couple',
-  Coworker = 'coworker',
-  Daughter = 'daughter',
-  Father = 'father',
-  Friend = 'friend',
-  Granddaughter = 'granddaughter',
-  Grandfather = 'grandfather',
-  Grandmother = 'grandmother',
-  Grandson = 'grandson',
-  Husband = 'husband',
-  Manager = 'manager',
-  Mentee = 'mentee',
-  Mentor = 'mentor',
-  Mother = 'mother',
-  Nephew = 'nephew',
-  Niece = 'niece',
-  Other = 'other',
-  Partner = 'partner',
-  Self = 'self',
-  Sibling = 'sibling',
-  Sister = 'sister',
-  Son = 'son',
-  Spouse = 'spouse',
-  Teammate = 'teammate',
-  Uncle = 'uncle',
-  Wife = 'wife',
-}
-
-export enum MergeStrategyEnum {
-  Merge = 'merge',
-  Replace = 'replace',
-}
-
-export enum IdentityTypeEnum {
-  Demographic = 'demographic',
-  Personal = 'personal',
-  Professional = 'professional',
-}
 
 const normalizeRelationshipValue = (input: unknown): RelationshipEnum | null => {
   if (input === null) return null;
@@ -92,8 +56,8 @@ export interface BaseCreateUserMemoryParams {
   details: string;
   detailsEmbedding?: number[];
   memoryCategory: string;
-  memoryLayer: 'content' | 'identity' | 'preference' | 'experience' | 'activity';
-  memoryType: string;
+  memoryLayer: LayersEnum;
+  memoryType: TypesEnum;
   summary: string;
   summaryEmbedding?: number[];
   title: string;
@@ -103,7 +67,7 @@ export interface BaseCreateUserMemoryParams {
 export interface CreateUserMemoryContextParams extends BaseCreateUserMemoryParams {
   context: Omit<
     UserMemoryContext,
-    'id' | 'userId' | 'createdAt' | 'updatedAt' | 'accessedAt' | 'userMemoryId'
+    'id' | 'userId' | 'createdAt' | 'updatedAt' | 'accessedAt' | 'userMemoryIds'
   >;
 }
 
@@ -233,18 +197,146 @@ export class UserMemoryModel {
     this.db = db;
   }
 
+  private buildBaseMemoryInsertValues(
+    params: BaseCreateUserMemoryParams,
+    options?: {
+      metadata?: Record<string, unknown> | null;
+      status?: string | null;
+      tags?: string[] | null;
+    },
+  ): typeof userMemories.$inferInsert {
+    const now = new Date();
+
+    return {
+      accessedCount: 0,
+      details: params.details ?? null,
+      detailsVector1024: params.detailsEmbedding ?? null,
+      lastAccessedAt: now,
+      memoryCategory: params.memoryCategory ?? null,
+      memoryLayer: params.memoryLayer,
+      memoryType: params.memoryType ?? null,
+      metadata: options?.metadata ?? null,
+      status: options?.status ?? null,
+      summary: params.summary ?? null,
+      summaryVector1024: params.summaryEmbedding ?? null,
+      tags: options?.tags ?? null,
+      title: params.title ?? null,
+      userId: this.userId,
+    } satisfies typeof userMemories.$inferInsert;
+  }
+
   create = async (params: CreateUserMemoryParams): Promise<UserMemoryItem> => {
     const [result] = await this.db
       .insert(userMemories)
-      .values({
-        ...params,
-        accessedCount: 0,
-        lastAccessedAt: new Date(),
-        userId: this.userId,
-      })
+      .values(this.buildBaseMemoryInsertValues(params))
       .returning();
 
     return result;
+  };
+
+  createContextMemory = async (
+    params: CreateUserMemoryContextParams,
+  ): Promise<{ context: UserMemoryContext; memory: UserMemoryItem }> => {
+    return this.db.transaction(async (tx) => {
+      const baseValues = this.buildBaseMemoryInsertValues(params, {
+        metadata: params.context.metadata ?? null,
+        tags: params.context.tags ?? null,
+      });
+
+      const [memory] = await tx.insert(userMemories).values(baseValues).returning();
+      if (!memory) throw new Error('Failed to create user memory context');
+
+      const contextValues = {
+        associatedObjects: params.context.associatedObjects ?? [],
+        associatedSubjects: params.context.associatedSubjects ?? [],
+        currentStatus: params.context.currentStatus ?? null,
+        description: params.context.description ?? null,
+        descriptionVector: params.context.descriptionVector ?? null,
+        metadata: params.context.metadata ?? null,
+        scoreImpact: params.context.scoreImpact ?? null,
+        scoreUrgency: params.context.scoreUrgency ?? null,
+        tags: params.context.tags ?? [],
+        title: params.context.title ?? null,
+        type: params.context.type ?? null,
+        userId: this.userId,
+        userMemoryIds: [memory.id],
+      } satisfies typeof userMemoriesContexts.$inferInsert;
+
+      const [context] = await tx.insert(userMemoriesContexts).values(contextValues).returning();
+
+      return { context, memory };
+    });
+  };
+
+  createExperienceMemory = async (
+    params: CreateUserMemoryExperienceParams,
+  ): Promise<{ experience: UserMemoryExperience; memory: UserMemoryItem }> => {
+    return this.db.transaction(async (tx) => {
+      const baseValues = this.buildBaseMemoryInsertValues(params, {
+        metadata: params.experience.metadata ?? null,
+        tags: params.experience.tags ?? null,
+      });
+
+      const [memory] = await tx.insert(userMemories).values(baseValues).returning();
+      if (!memory) throw new Error('Failed to create user memory experience');
+
+      const experienceValues = {
+        action: params.experience.action ?? null,
+        actionVector: params.experience.actionVector ?? null,
+        keyLearning: params.experience.keyLearning ?? null,
+        keyLearningVector: params.experience.keyLearningVector ?? null,
+        metadata: params.experience.metadata ?? null,
+        possibleOutcome: params.experience.possibleOutcome ?? null,
+        reasoning: params.experience.reasoning ?? null,
+        scoreConfidence: params.experience.scoreConfidence ?? null,
+        situation: params.experience.situation ?? null,
+        situationVector: params.experience.situationVector ?? null,
+        tags: params.experience.tags ?? [],
+        type: params.experience.type ?? params.memoryType ?? null,
+        userId: this.userId,
+        userMemoryId: memory.id,
+      } satisfies typeof userMemoriesExperiences.$inferInsert;
+
+      const [experience] = await tx
+        .insert(userMemoriesExperiences)
+        .values(experienceValues)
+        .returning();
+
+      return { experience, memory };
+    });
+  };
+
+  createPreferenceMemory = async (
+    params: CreateUserMemoryPreferenceParams,
+  ): Promise<{ memory: UserMemoryItem; preference: UserMemoryPreference }> => {
+    return this.db.transaction(async (tx) => {
+      const baseValues = this.buildBaseMemoryInsertValues(params, {
+        metadata: params.preference.metadata ?? null,
+        tags: params.preference.tags ?? null,
+      });
+
+      const [memory] = await tx.insert(userMemories).values(baseValues).returning();
+      if (!memory) throw new Error('Failed to create user memory preference');
+
+      const preferenceValues = {
+        conclusionDirectives: params.preference.conclusionDirectives ?? null,
+        conclusionDirectivesVector: params.preference.conclusionDirectivesVector ?? null,
+        metadata: params.preference.metadata ?? null,
+        scorePriority: params.preference.scorePriority ?? null,
+        suggestions: params.preference.suggestions ?? null,
+        tags: params.preference.tags ?? [],
+        type: params.preference.type ?? params.memoryType ?? null,
+        userId: this.userId,
+        userMemoryId: memory.id,
+      } satisfies typeof userMemoriesPreferences.$inferInsert;
+
+      const [preference] = await tx
+        .insert(userMemoriesPreferences)
+        .values(preferenceValues)
+        .returning();
+
+      return { memory, preference };
+    });
   };
 
   search = async (params: SearchUserMemoryParams): Promise<UserMemorySearchAggregatedResult> => {
@@ -356,10 +448,6 @@ export class UserMemoryModel {
     if (vectors.descriptionVector !== undefined) {
       vectorUpdates.descriptionVector = vectors.descriptionVector;
     }
-    if (vectors.titleVector !== undefined) {
-      vectorUpdates.titleVector = vectors.titleVector;
-    }
-
     if (Object.keys(vectorUpdates).length === 0) {
       return;
     }
@@ -710,7 +798,6 @@ export class UserMemoryModel {
         scoreUrgency: userMemoriesContexts.scoreUrgency,
         tags: userMemoriesContexts.tags,
         title: userMemoriesContexts.title,
-        titleVector: userMemoriesContexts.titleVector,
         type: userMemoriesContexts.type,
         updatedAt: userMemoriesContexts.updatedAt,
         userId: userMemoriesContexts.userId,

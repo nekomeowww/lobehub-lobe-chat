@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { idGenerator } from '@/database/utils/idGenerator';
+import { LayersEnum, MergeStrategyEnum, TypesEnum } from '@/types/userMemory';
 
 import {
   userMemories,
@@ -20,7 +21,6 @@ import {
   CreateUserMemoryExperienceParams,
   CreateUserMemoryIdentityParams,
   CreateUserMemoryPreferenceParams,
-  MergeStrategyEnum,
   UserMemoryModel,
 } from '../userMemory';
 import { getTestDB } from './_util';
@@ -76,13 +76,13 @@ afterEach(async () => {
 });
 
 function generateRandomCreateUserMemoryParams(
-  memoryLayer: BaseCreateUserMemoryParams['memoryLayer'] = 'experience',
+  memoryLayer: BaseCreateUserMemoryParams['memoryLayer'],
 ): BaseCreateUserMemoryParams {
   return {
     title: 'title ' + nanoid(),
     summary: 'summary ' + nanoid(),
     summaryEmbedding: generateRandomEmbedding(),
-    memoryType: 'memoryType',
+    memoryType: TypesEnum.Activity,
     memoryCategory: 'category',
     memoryLayer,
     details: 'details ' + nanoid(),
@@ -91,7 +91,7 @@ function generateRandomCreateUserMemoryParams(
 
 function generateRandomCreateUserMemoryExperienceParams() {
   return {
-    ...generateRandomCreateUserMemoryParams(),
+    ...generateRandomCreateUserMemoryParams(LayersEnum.Experience),
     experience: {
       action: 'action ' + nanoid(),
       actionVector: generateRandomEmbedding(),
@@ -113,7 +113,7 @@ function generateRandomCreateUserMemoryIdentityParams() {
   const relationshipOptions = ['self', 'friend', 'colleague', 'other'];
 
   return {
-    ...generateRandomCreateUserMemoryParams('identity'),
+    ...generateRandomCreateUserMemoryParams(LayersEnum.Identity),
     identity: {
       description: 'identity description ' + nanoid(),
       descriptionVector: generateRandomEmbedding(),
@@ -129,7 +129,7 @@ function generateRandomCreateUserMemoryIdentityParams() {
 
 function generateRandomCreateUserMemoryContextParams() {
   return {
-    ...generateRandomCreateUserMemoryParams('content'),
+    ...generateRandomCreateUserMemoryParams(LayersEnum.Context),
     context: {
       associatedObjects: [],
       associatedSubjects: [],
@@ -150,7 +150,7 @@ function generateRandomCreateUserMemoryContextParams() {
 
 function generateRandomCreateUserMemoryPreferenceParams() {
   return {
-    ...generateRandomCreateUserMemoryParams('preference'),
+    ...generateRandomCreateUserMemoryParams(LayersEnum.Preference),
     preference: {
       conclusionDirectives: 'directive ' + nanoid(),
       conclusionDirectivesVector: generateRandomEmbedding(),
@@ -338,19 +338,12 @@ describe('UserMemoryModel', () => {
         userId,
       });
 
-      const titleVector = generateRandomEmbedding();
       const descriptionVector = generateRandomEmbedding();
-
-      await userMemoryModel.updateContextVectors(contextId, {
-        descriptionVector,
-        titleVector,
-      });
-
+      await userMemoryModel.updateContextVectors(contextId, { descriptionVector });
       const updated = await serverDB.query.userMemoriesContexts.findFirst({
         where: eq(userMemoriesContexts.id, contextId),
       });
 
-      expectVectorToBeClose(updated?.titleVector, titleVector);
       expectVectorToBeClose(updated?.descriptionVector, descriptionVector);
     });
 
