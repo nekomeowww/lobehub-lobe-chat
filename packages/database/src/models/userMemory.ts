@@ -109,7 +109,6 @@ export interface SearchUserMemoryParams {
 
 export interface SearchUserMemoryWithEmbeddingParams {
   embedding: number[];
-  limit?: number;
   limits?: Partial<Record<'contexts' | 'experiences' | 'preferences', number>>;
   memoryCategory?: string;
   memoryType?: string;
@@ -340,19 +339,18 @@ export class UserMemoryModel {
   };
 
   search = async (params: SearchUserMemoryParams): Promise<UserMemorySearchAggregatedResult> => {
-    const { embedding, limit = 5, limits, memoryType } = params;
+    const { embedding, limits } = params;
 
     const resolvedLimits = {
-      contexts: limits?.contexts ?? limit,
-      experiences: limits?.experiences ?? limit,
-      preferences: limits?.preferences ?? limit,
+      contexts: limits?.contexts,
+      experiences: limits?.experiences,
+      preferences: limits?.preferences,
     };
 
     const [experiences, contexts, preferences] = await Promise.all([
       this.searchExperiences({
         embedding,
         limit: resolvedLimits.experiences,
-        type: memoryType,
       }),
       this.searchContexts({
         embedding,
@@ -361,7 +359,6 @@ export class UserMemoryModel {
       this.searchPreferences({
         embedding,
         limit: resolvedLimits.preferences,
-        type: memoryType,
       }),
     ]);
 
@@ -782,6 +779,9 @@ export class UserMemoryModel {
     type?: string;
   }): Promise<UserMemoryContext[]> => {
     const { embedding, limit = 5, type } = params;
+    if (limit <= 0) {
+      return [];
+    }
 
     let query = this.db
       .select({
@@ -831,6 +831,9 @@ export class UserMemoryModel {
     type?: string;
   }): Promise<UserMemoryExperience[]> => {
     const { embedding, limit = 5, type } = params;
+    if (limit <= 0) {
+      return [];
+    }
 
     let query = this.db
       .select({
@@ -881,6 +884,9 @@ export class UserMemoryModel {
     type?: string;
   }): Promise<UserMemoryPreference[]> => {
     const { embedding, limit = 5, type } = params;
+    if (limit <= 0) {
+      return [];
+    }
 
     let query = this.db
       .select({

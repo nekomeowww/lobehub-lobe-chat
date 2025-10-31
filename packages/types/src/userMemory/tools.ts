@@ -216,9 +216,9 @@ export const removeIdentityMemorySchema = z.object({
 export type RemoveIdentityMemoryParams = z.infer<typeof removeIdentityMemorySchema>;
 
 export const searchMemorySchema = z.object({
-  limit: z.string(),
-  memoryCategory: z.string(),
-  memoryType: z.string(),
+  // TODO: we need to dynamically fetch the available categories/types from the backend
+  // memoryCategory: z.string().optional(),
+  // memoryType: z.string().optional(),
   query: z.string(),
   topK: z.object({
     contexts: z.coerce.number().int().min(0),
