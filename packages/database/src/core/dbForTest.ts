@@ -17,7 +17,7 @@ export const getTestDBInstance = async () => {
   let connectionString = serverDBEnv.DATABASE_TEST_URL;
 
   if (!connectionString) {
-    throw new Error(`You are try to use database, but "DATABASE_TEST_URL" is not set correctly`);
+    throw new Error(`You are trying to use database, but "DATABASE_TEST_URL" is not set correctly`);
   }
 
   if (serverDBEnv.DATABASE_DRIVER === 'node') {

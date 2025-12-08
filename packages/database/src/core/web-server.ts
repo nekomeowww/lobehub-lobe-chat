@@ -25,7 +25,7 @@ If you don't have it, please run \`openssl rand -base64 32\` to create one.
   let connectionString = serverDBEnv.DATABASE_URL;
 
   if (!connectionString) {
-    throw new Error(`You are try to use database, but "DATABASE_URL" is not set correctly`);
+    throw new Error(`You are trying to use database, but "DATABASE_URL" is not set correctly`);
   }
 
   if (serverDBEnv.DATABASE_DRIVER === 'node') {
